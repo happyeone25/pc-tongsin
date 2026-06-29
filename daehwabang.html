@@ -1,0 +1,297 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>큰마을 PC통신</title>
+
+<style>
+  @import url("https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css");
+  :root{
+    --bg:#0000aa; --bg-dark:#00006b; --border:#55ffff;
+    --txt:#c8c8d4; --bright:#ffffff; --cyan:#55ffff;
+    --yellow:#ffff55; --green:#55ff55; --magenta:#ff55ff; --red:#ff5555;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#000; }
+  body{ display:flex; align-items:center; justify-content:center; min-height:100vh; padding:16px;
+        font-family:"Galmuri11","DungGeunMo","D2Coding",monospace; }
+
+  .monitor{ width:100%; max-width:880px; height:min(86vh,680px);
+    background:var(--bg); border:14px solid #2b2b2b; border-radius:14px;
+    box-shadow:0 0 0 2px #000, 0 18px 50px rgba(0,0,0,.7);
+    position:relative; overflow:hidden; }
+  .monitor::after{ content:""; position:absolute; inset:0; pointer-events:none; z-index:3;
+    background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.16) 2px 3px);
+    mix-blend-mode:multiply; }
+  .screen{ height:100%; padding:14px 16px; color:var(--txt); font-size:16px; line-height:1.55;
+    letter-spacing:.5px; position:relative; z-index:1; display:flex; flex-direction:column; }
+
+  .topbar{ display:flex; align-items:center; gap:10px; margin-bottom:6px; flex:0 0 auto; }
+  .logo{ background:var(--cyan); color:var(--bg); padding:0 8px; font-weight:bold; }
+  .title{ flex:1; text-align:center; color:var(--bright); font-weight:bold; }
+  .count{ color:var(--yellow); }
+  .back{ color:var(--cyan); cursor:pointer; border:1px solid var(--border); padding:0 6px; }
+  .back:hover{ background:var(--cyan); color:var(--bg); }
+  hr.line{ border:0; border-top:1px solid var(--border); margin:6px 0; opacity:.7; width:100%; flex:0 0 auto; }
+
+  input,textarea{ background:var(--bg-dark); color:var(--bright); border:1px solid var(--border);
+    font-family:inherit; font-size:15px; padding:8px 10px; letter-spacing:.5px; outline:none; width:100%; }
+  textarea{ min-height:200px; resize:none; flex:1; }
+  button{ font-family:inherit; font-size:15px; cursor:pointer; padding:8px 12px;
+    background:var(--cyan); color:var(--bg); border:0; }
+  button.ghost{ background:transparent; color:var(--cyan); border:1px solid var(--border); }
+
+  .form{ display:flex; flex-direction:column; gap:10px; max-width:440px; margin:auto; width:100%; }
+  .form h2{ color:var(--cyan); text-align:center; margin:0 0 4px; }
+  .rowbtn{ display:flex; gap:8px; } .rowbtn button{ flex:1; }
+  .muted{ color:#8888bb; font-size:13px; text-align:center; }
+  .err{ color:var(--red); text-align:center; min-height:18px; }
+
+  /* 메인 메뉴 */
+  .menu-list{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:4px; max-width:520px; margin:0 auto; width:100%; }
+  .menu-item{ cursor:pointer; padding:6px 10px; display:flex; gap:14px; }
+  .menu-item:hover{ background:var(--bg-dark); }
+  .menu-item .num{ color:var(--yellow); font-weight:bold; }
+  .menu-item .nm{ color:var(--bright); width:130px; }
+  .menu-item .desc{ color:#8899cc; }
+  .menu-item.soon .nm,.menu-item.soon .desc{ color:#5a6aa0; }
+
+  /* 게시판 */
+  .scroll{ flex:1; overflow-y:auto; min-height:0; padding-right:4px; }
+  .head-row{ color:var(--cyan); }
+  .post{ display:block; cursor:pointer; white-space:pre; }
+  .post:hover{ color:var(--bright); background:var(--bg-dark); }
+  .read-head{ color:var(--cyan); }
+  .read-body{ color:var(--bright); white-space:pre-wrap; padding:8px 0; }
+
+  /* 대화방 */
+  .body{ flex:1; display:flex; gap:12px; min-height:0; }
+  .log{ flex:1; overflow-y:auto; padding-right:6px; padding-bottom:6px; white-space:pre-wrap; min-height:0; }
+  .members{ width:150px; border-left:1px solid var(--border); padding-left:10px; overflow-y:auto; }
+  .members h3{ color:var(--yellow); margin:0 0 6px; font-size:15px; }
+  .members div{ cursor:pointer; }
+  .members div:hover{ text-decoration:underline; }
+  .sys{ color:var(--yellow); } .me-tag{ color:var(--cyan); }
+  .nick{ font-weight:bold; } .time{ color:#7777aa; font-size:12px; }
+  .whisper{ color:var(--magenta); }
+  .codebox{ color:var(--bg); background:var(--yellow); padding:0 6px; font-weight:bold; }
+
+  .inputbar{ display:flex; gap:8px; align-items:center; margin-top:6px; flex:0 0 auto; }
+  .inputbar .pmt{ color:var(--cyan); white-space:nowrap; } .inputbar input{ flex:1; }
+  .footmenu{ color:var(--green); flex:0 0 auto; }
+  .footmenu b{ color:var(--bright); }
+  ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#3a3a8f; }
+  @media (max-width:560px){ .screen{ font-size:13px; } .members{ width:108px; } .menu-item .nm{ width:96px; } }
+</style>
+
+<div class="monitor"><div class="screen" id="screen"></div></div>
+
+<script>
+const $  = (s)=>document.querySelector(s);
+const esc=(s)=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const pad=(s,n)=>String(s).padEnd(n," "); const padL=(s,n)=>String(s).padStart(n," ");
+const hhmm=(t)=>{ const d=new Date(t); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+const mmdd=(t)=>{ const d=new Date(t); return String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const PALETTE=["#55ffff","#55ff55","#ffff55","#ff55ff","#ff5555","#ffffff","#88aaff"];
+const colorOf=(n)=>{ let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))>>>0; return PALETTE[h%PALETTE.length]; };
+
+let me="", room="", stage="auth", curPost=null;
+let ws=null, wsReady=false, queue=[];
+function autoWsUrl(){
+  if(location.protocol==="http:"||location.protocol==="https:")
+    return (location.protocol==="https:"?"wss://":"ws://")+location.host;
+  return "ws://localhost:8080";
+}
+function connect(url){
+  ws=new WebSocket(url);
+  ws.onopen=()=>{ wsReady=true; queue.forEach(x=>ws.send(x)); queue=[]; };
+  ws.onmessage=(e)=>{ try{ handle(JSON.parse(e.data)); }catch{} };
+  ws.onerror=()=>{ const el=$("#err"); if(el) el.textContent="서버에 연결 못함 — 잠시 후 다시 시도하세요."; };
+  ws.onclose=()=>{ wsReady=false; };
+}
+function sendS(obj){ const s=JSON.stringify(obj); if(wsReady) ws.send(s); else queue.push(s); }
+
+/* ── 들어온 메시지 처리 ── */
+function handle(d){
+  switch(d.kind){
+    case "auth-ok":  me=d.username; goHome(); break;
+    case "auth-err": setErr(d.text); break;
+    case "join-err": setErr(d.text); break;
+    case "board-err":setErr(d.text); break;
+    case "board-list": if(stage==="board") drawBoardList(d.list); break;
+    case "board-read": curPost=d.post; renderBoardRead(); break;
+    case "board-written": sendS({action:"board-list"}); stage="board"; renderBoard(); break;
+    case "joined": room=d.code; renderChat(); break;
+    case "history": d.list.forEach(x=>addMsg(x.nick,x.text,x.nick===me,x.time)); break;
+    case "roster": drawMembers(d.list); break;
+    case "system": addSystem(d.text); break;
+    case "msg": addMsg(d.nick,d.text,d.nick===me,d.time); break;
+    case "whisper": addWhisper(d.from,d.to,d.text,d.mine); break;
+    case "whisper-err": addSystem(d.text); break;
+  }
+}
+function setErr(t){ const el=$("#err"); if(el) el.textContent=t; }
+function topbar(titleHtml, rightHtml, withBack){
+  return `<div class="topbar"><span class="logo">hitel</span>
+    ${withBack?`<span class="back" id="back">◀ 이전</span>`:""}
+    <span class="title">${titleHtml}</span>
+    <span class="count">${rightHtml||""}</span></div><hr class="line">`;
+}
+
+/* ── 1. 로그인 / 회원가입 ── */
+function renderAuth(){
+  stage="auth";
+  $("#screen").innerHTML = topbar("큰 마 을  P C 통 신","",false)+`
+    <div class="form">
+      <h2>＊ 회원 접속 ＊</h2>
+      <input id="user" placeholder="아이디" maxlength="16" autocomplete="off">
+      <input id="pw" type="password" placeholder="비밀번호" maxlength="32">
+      <div class="rowbtn"><button id="login">로그인</button>
+        <button class="ghost" id="signup">회원가입</button></div>
+      <div class="err" id="err"></div>
+      <div class="muted">처음이면 회원가입 먼저 하세요.</div>
+    </div>`;
+  $("#user").focus();
+  const go=(action)=>{ setErr(""); const u=$("#user").value.trim(), p=$("#pw").value;
+    if(!u||!p){ setErr("아이디와 비밀번호를 입력하세요."); return; }
+    if(!ws) connect(autoWsUrl()); sendS({action, username:u, password:p}); };
+  $("#login").onclick=()=>go("login");
+  $("#signup").onclick=()=>go("signup");
+  $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") go("login"); });
+}
+
+/* ── 2. 메인 메뉴 (홈) ── */
+function goHome(){ stage="home"; renderHome(); }
+function renderHome(){
+  const items=[
+    {n:1, nm:"플라자", desc:"게시판 — 글 읽고 쓰기", act:()=>enterBoard()},
+    {n:2, nm:"대화방", desc:"실시간 채팅 / 귓속말", act:()=>renderRoomCode()},
+    {n:3, nm:"자료실", desc:"(준비중)", soon:true},
+    {n:4, nm:"쪽지함", desc:"(준비중)", soon:true},
+    {n:0, nm:"접속 종료", desc:"로그아웃", act:()=>logout()},
+  ];
+  $("#screen").innerHTML = topbar("메 인 메 뉴", esc(me)+" 님", false)+
+    `<div class="menu-list" id="menu"></div>
+     <hr class="line"><div class="muted">번호를 누르거나 항목을 클릭하세요.</div>`;
+  const box=$("#menu");
+  items.forEach(it=>{
+    const el=document.createElement("div");
+    el.className="menu-item"+(it.soon?" soon":"");
+    el.innerHTML=`<span class="num">${it.n}.</span><span class="nm">${it.nm}</span><span class="desc">${it.desc}</span>`;
+    if(it.act) el.onclick=it.act;
+    box.appendChild(el);
+  });
+  document.onkeydown=(e)=>{ const it=items.find(x=>String(x.n)===e.key); if(it&&it.act) it.act(); };
+}
+function logout(){ me=""; document.onkeydown=null; renderAuth(); }
+
+/* ── 3. 플라자(게시판) ── */
+function enterBoard(){ document.onkeydown=null; stage="board"; renderBoard(); sendS({action:"board-list"}); }
+function renderBoard(){
+  $("#screen").innerHTML = topbar("플 라 자 (게시판)","글 목록", true)+
+    `<div class="head-row">번호  　이　름　 　날짜　 조회  제　목</div><hr class="line">
+     <div class="scroll" id="list"><div class="muted">불러오는 중...</div></div>
+     <hr class="line">
+     <div class="footmenu"><b>W</b> 글쓰기　　<b>이전</b> 메뉴로</div>`;
+  $("#back").onclick=goHome;
+  document.onkeydown=(e)=>{ if(e.key.toLowerCase()==="w") renderBoardWrite(); };
+}
+function drawBoardList(list){
+  const box=$("#list"); if(!box) return;
+  if(list.length===0){ box.innerHTML=`<div class="muted">아직 글이 없습니다. W를 눌러 첫 글을 써보세요.</div>`; return; }
+  box.innerHTML = list.map(p=>{
+    const line=`${padL(p.no,5)}  ${pad(p.nick,6)} ${mmdd(p.time)} ${padL(p.hit,4)}  ${esc(p.title)}`;
+    return `<span class="post" data-no="${p.no}">${line}</span>`;
+  }).join("\n");
+  document.querySelectorAll(".post").forEach(el=>{ el.onclick=()=>sendS({action:"board-read", no:+el.dataset.no}); });
+}
+function renderBoardRead(){
+  stage="boardread";
+  const p=curPost;
+  $("#screen").innerHTML = topbar("플 라 자 — 글 읽기","No."+p.no, true)+
+    `<div class="read-head">제 목 : ${esc(p.title)}
+글쓴이 : ${esc(p.nick)}    날짜 : ${mmdd(p.time)} ${hhmm(p.time)}    조회 : ${p.hit}</div>
+     <hr class="line">
+     <div class="scroll"><div class="read-body">${esc(p.body)||"(내용 없음)"}</div></div>
+     <hr class="line"><div class="footmenu"><b>이전</b> 목록으로</div>`;
+  $("#back").onclick=()=>{ stage="board"; renderBoard(); sendS({action:"board-list"}); };
+  document.onkeydown=(e)=>{ if(e.key==="Escape"||e.key.toLowerCase()==="p"){ stage="board"; renderBoard(); sendS({action:"board-list"}); } };
+}
+function renderBoardWrite(){
+  stage="boardwrite"; document.onkeydown=null;
+  $("#screen").innerHTML = topbar("플 라 자 — 글 쓰기","", true)+
+    `<input id="w-title" placeholder="제목" maxlength="60"><div style="height:8px"></div>
+     <textarea id="w-body" placeholder="내용을 입력하세요..."></textarea>
+     <hr class="line">
+     <div class="rowbtn"><button id="w-save">등록</button>
+       <button class="ghost" id="w-cancel">취소</button></div>
+     <div class="err" id="err"></div>`;
+  $("#w-title").focus();
+  $("#back").onclick=()=>{ stage="board"; renderBoard(); sendS({action:"board-list"}); };
+  $("#w-cancel").onclick=()=>{ stage="board"; renderBoard(); sendS({action:"board-list"}); };
+  $("#w-save").onclick=()=>{
+    const title=$("#w-title").value.trim();
+    if(!title){ setErr("제목을 입력하세요."); return; }
+    sendS({action:"board-write", title, body:$("#w-body").value});
+  };
+}
+
+/* ── 4. 대화방: 방 코드 ── */
+function renderRoomCode(){
+  stage="roomcode"; document.onkeydown=null;
+  $("#screen").innerHTML = topbar("대 화 방", esc(me)+" 님", true)+`
+    <div class="form">
+      <h2>＊ 방 코드 4자리 ＊</h2>
+      <input id="code" placeholder="예: 1004" maxlength="4" inputmode="numeric"
+             style="text-align:center; font-size:26px; letter-spacing:10px;">
+      <button id="enter">입장 / 새 방 만들기</button>
+      <div class="err" id="err"></div>
+      <div class="muted">같은 코드를 아는 사람끼리만 모입니다.</div>
+    </div>`;
+  $("#back").onclick=goHome;
+  $("#code").focus();
+  const enter=()=>{ setErr(""); const c=$("#code").value.trim();
+    if(!/^\d{4}$/.test(c)){ setErr("숫자 4자리로 입력하세요."); return; } sendS({action:"join", code:c}); };
+  $("#enter").onclick=enter;
+  $("#code").addEventListener("keydown",e=>{ if(e.key==="Enter") enter(); });
+}
+
+/* ── 5. 대화방: 채팅 ── */
+function renderChat(){
+  stage="chat"; document.onkeydown=null;
+  $("#screen").innerHTML = topbar(`수다방 <span class="codebox">${esc(room)}</span>`, `<span id="hdr-count">참가자 0</span>`, true)+`
+    <div class="body">
+      <div class="log" id="log"></div>
+      <div class="members"><h3>참가자</h3><div id="mlist"></div></div>
+    </div>
+    <hr class="line">
+    <div class="inputbar"><span class="pmt">${esc(me)} &gt;&gt;</span>
+      <input id="say" placeholder="대화 입력 · 귓속말은 /귓 닉네임 내용" autocomplete="off"></div>`;
+  $("#back").onclick=()=>{ sendS({action:"leave-room"}); room=""; goHome(); };
+  $("#say").focus();
+  $("#say").addEventListener("keydown",e=>{
+    if(e.key!=="Enter") return;
+    const v=e.target.value.trim(); if(!v) return; e.target.value="";
+    const w=v.match(/^\/(?:귓|w)\s+(\S+)\s+([\s\S]+)$/);
+    if(w) sendS({action:"whisper", to:w[1], text:w[2]});
+    else  sendS({action:"say", text:v});
+  });
+  addSystem(`'${room}' 번 방에 입장했습니다. 코드를 아는 사람과 공유하세요.`);
+}
+function addLine(html){ const l=$("#log"); if(!l) return; l.insertAdjacentHTML("beforeend",html); l.scrollTop=l.scrollHeight; }
+function addSystem(t){ addLine(`<div class="sys">─ ${esc(t)}</div>`); }
+function addMsg(nick,text,mine,time){
+  const c=colorOf(nick), tag=mine?`<span class="me-tag">[나] </span>`:"";
+  addLine(`<div><span class="time">${hhmm(time||Date.now())} </span>${tag}<span class="nick" style="color:${c}">${esc(nick)}</span> : ${esc(text)}</div>`);
+}
+function addWhisper(from,to,text,mine){
+  const label = mine ? `${esc(to)} 님에게 귓속말` : `${esc(from)} 님의 귓속말`;
+  addLine(`<div class="whisper">((${label})) ${esc(text)}</div>`);
+}
+function drawMembers(list){
+  const box=$("#mlist"); if(!box) return;
+  box.innerHTML=list.map(n=>`<div style="color:${colorOf(n)}" data-n="${esc(n)}">● ${esc(n)}</div>`).join("");
+  const c=$("#hdr-count"); if(c) c.textContent=`참가자 ${list.length}`;
+  document.querySelectorAll("#mlist div").forEach(el=>{ el.onclick=()=>{ const s=$("#say"); s.value=`/귓 ${el.dataset.n} `; s.focus(); }; });
+}
+
+renderAuth();
+</script>
