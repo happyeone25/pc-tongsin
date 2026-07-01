@@ -1,0 +1,13 @@
+{
+  "name": "keunmaeul-chat",
+  "version": "1.0.0",
+  "description": "하이텔 스타일 PC통신",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "@upstash/redis": "^1.34.0"
+  }
+}
