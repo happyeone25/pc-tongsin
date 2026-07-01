@@ -1,0 +1,356 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>큰마을 PC통신</title>
+<style>
+  @import url("https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css");
+  :root{ --bg:#0000aa; --bg-dark:#00006b; --border:#55ffff; --txt:#c8c8d4; --bright:#ffffff;
+    --cyan:#55ffff; --yellow:#ffff55; --green:#55ff55; --magenta:#ff55ff; --red:#ff5555; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#000; }
+  body{ display:flex; align-items:center; justify-content:center; min-height:100vh; padding:16px;
+        font-family:"Galmuri11","DungGeunMo","D2Coding",monospace; }
+  .monitor{ width:100%; max-width:880px; height:min(86vh,680px); background:var(--bg);
+    border:14px solid #2b2b2b; border-radius:14px; box-shadow:0 0 0 2px #000,0 18px 50px rgba(0,0,0,.7);
+    position:relative; overflow:hidden; }
+  .monitor::after{ content:""; position:absolute; inset:0; pointer-events:none; z-index:3;
+    background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px,rgba(0,0,0,.16) 2px 3px); mix-blend-mode:multiply; }
+  .screen{ height:100%; padding:14px 16px; color:var(--txt); font-size:16px; line-height:1.55;
+    letter-spacing:.5px; position:relative; z-index:1; display:flex; flex-direction:column; }
+  .topbar{ display:flex; align-items:center; gap:10px; margin-bottom:6px; flex:0 0 auto; }
+  .logo{ background:var(--cyan); color:var(--bg); padding:0 8px; font-weight:bold; }
+  .title{ flex:1; text-align:center; color:var(--bright); font-weight:bold; }
+  .count{ color:var(--yellow); }
+  .back{ color:var(--cyan); cursor:pointer; border:1px solid var(--border); padding:0 6px; }
+  .back:hover{ background:var(--cyan); color:var(--bg); }
+  hr.line{ border:0; border-top:1px solid var(--border); margin:6px 0; opacity:.7; width:100%; flex:0 0 auto; }
+  input,textarea{ background:var(--bg-dark); color:var(--bright); border:1px solid var(--border);
+    font-family:inherit; font-size:15px; padding:8px 10px; letter-spacing:.5px; outline:none; width:100%; }
+  textarea{ min-height:120px; resize:none; }
+  button{ font-family:inherit; font-size:15px; cursor:pointer; padding:8px 12px; background:var(--cyan); color:var(--bg); border:0; }
+  button.ghost{ background:transparent; color:var(--cyan); border:1px solid var(--border); }
+  button.danger{ background:transparent; color:var(--red); border:1px solid var(--red); }
+  .form{ display:flex; flex-direction:column; gap:10px; max-width:460px; margin:auto; width:100%; }
+  .form h2{ color:var(--cyan); text-align:center; margin:0 0 4px; }
+  .rowbtn{ display:flex; gap:8px; } .rowbtn button{ flex:1; }
+  .muted{ color:#8888bb; font-size:13px; text-align:center; }
+  .err{ color:var(--red); text-align:center; min-height:18px; flex:0 0 auto; }
+  .ok{ color:var(--green); }
+  .menu-list{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:4px; max-width:540px; margin:0 auto; width:100%; }
+  .menu-item{ cursor:pointer; padding:6px 10px; display:flex; gap:14px; }
+  .menu-item:hover{ background:var(--bg-dark); }
+  .menu-item .num{ color:var(--yellow); font-weight:bold; }
+  .menu-item .nm{ color:var(--bright); width:120px; }
+  .menu-item .desc{ color:#8899cc; }
+  .badge{ color:var(--red); font-weight:bold; }
+  .scroll{ flex:1; overflow-y:auto; min-height:0; padding-right:4px; }
+  .head-row{ color:var(--cyan); }
+  .post{ display:block; cursor:pointer; white-space:pre; }
+  .post:hover{ color:var(--bright); background:var(--bg-dark); }
+  .post.unread{ color:var(--yellow); }
+  .post.reply{ color:#9fb4ff; }
+  .read-head{ color:var(--cyan); }
+  .read-body{ color:var(--bright); white-space:pre-wrap; padding:8px 0; }
+  .link{ color:var(--green); word-break:break-all; }
+  .recbtn{ color:var(--yellow); cursor:pointer; border:1px solid var(--yellow); padding:0 8px; }
+  .recbtn:hover{ background:var(--yellow); color:var(--bg); }
+  .body{ flex:1; display:flex; gap:12px; min-height:0; }
+  .log{ flex:1; overflow-y:auto; padding-right:6px; padding-bottom:6px; white-space:pre-wrap; min-height:0; }
+  .members{ width:150px; border-left:1px solid var(--border); padding-left:10px; overflow-y:auto; }
+  .members h3{ color:var(--yellow); margin:0 0 6px; font-size:15px; }
+  .members div{ cursor:pointer; } .members div:hover{ text-decoration:underline; }
+  .sys{ color:var(--yellow); } .me-tag{ color:var(--cyan); }
+  .nick{ font-weight:bold; } .time{ color:#7777aa; font-size:12px; }
+  .whisper{ color:var(--magenta); }
+  .codebox{ color:var(--bg); background:var(--yellow); padding:0 6px; font-weight:bold; }
+  .inputbar{ display:flex; gap:8px; align-items:center; margin-top:6px; flex:0 0 auto; }
+  .inputbar .pmt{ color:var(--cyan); white-space:nowrap; } .inputbar input{ flex:1; }
+  .footmenu{ color:var(--green); flex:0 0 auto; } .footmenu b{ color:var(--bright); }
+  ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#3a3a8f; }
+  @media (max-width:560px){ .screen{ font-size:13px; } .members{ width:108px; } .menu-item .nm{ width:88px; } }
+</style>
+<div class="monitor"><div class="screen" id="screen"></div></div>
+<script>
+const $=(s)=>document.querySelector(s);
+const esc=(s)=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const pad=(s,n)=>String(s).padEnd(n," "), padL=(s,n)=>String(s).padStart(n," ");
+const hhmm=(t)=>{const d=new Date(t);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
+const mmdd=(t)=>{const d=new Date(t);return String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+const PALETTE=["#55ffff","#55ff55","#ffff55","#ff55ff","#ff5555","#ffffff","#88aaff"];
+const colorOf=(n)=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length];};
+
+let me="",room="",stage="auth",curPost=null,curFile=null,curNote=null,newNote=false;
+let ws=null,wsReady=false,queue=[];
+function autoWsUrl(){ if(location.protocol==="http:"||location.protocol==="https:") return (location.protocol==="https:"?"wss://":"ws://")+location.host; return "ws://localhost:8080"; }
+function connect(url){ ws=new WebSocket(url);
+  ws.onopen=()=>{wsReady=true;queue.forEach(x=>ws.send(x));queue=[];};
+  ws.onmessage=(e)=>{try{handle(JSON.parse(e.data));}catch{}};
+  ws.onerror=()=>{const el=$("#err");if(el)el.textContent="서버에 연결 못함 — 잠시 후 다시 시도하세요.";};
+  ws.onclose=()=>{wsReady=false;};
+}
+function sendS(o){const s=JSON.stringify(o);if(wsReady)ws.send(s);else queue.push(s);}
+function setErr(t,ok){const el=$("#err");if(el){el.textContent=t;el.className="err"+(ok?" ok":"");}}
+
+function handle(d){switch(d.kind){
+  case "auth-ok": me=d.username; goHome(); break;
+  case "auth-err": case "join-err": setErr(d.text); break;
+  case "board-err": case "file-err": case "note-err": setErr(d.text); break;
+  case "board-list": if(stage==="board") drawBoardList(d.list); break;
+  case "board-read": curPost=d.post; curPost.__mine=d.mine; renderBoardRead(); break;
+  case "board-written": sendS({action:"board-list"}); stage="board"; renderBoard(); break;
+  case "file-list": if(stage==="files") drawFileList(d.list); break;
+  case "file-read": curFile=d.file; curFile.__mine=d.mine; renderFileRead(); break;
+  case "file-written": sendS({action:"file-list"}); stage="files"; renderFiles(); break;
+  case "note-list": if(stage==="notes") drawNoteList(d.list); break;
+  case "note-read": curNote=d.note; renderNoteRead(); break;
+  case "note-sent": stage="notes"; renderNotes(); sendS({action:"note-list"}); setTimeout(()=>setErr("쪽지를 보냈습니다.",true),50); break;
+  case "note-ping": newNote=true; if(stage==="notes") sendS({action:"note-list"}); else if(stage==="home") renderHome(); break;
+  case "joined": room=d.code; renderChat(); break;
+  case "history": d.list.forEach(x=>addMsg(x.nick,x.text,x.nick===me,x.time)); break;
+  case "roster": drawMembers(d.list); break;
+  case "system": addSystem(d.text); break;
+  case "msg": addMsg(d.nick,d.text,d.nick===me,d.time); break;
+  case "whisper": addWhisper(d.from,d.to,d.text,d.mine); break;
+  case "whisper-err": addSystem(d.text); break;
+}}
+
+function topbar(t,r,back){ return `<div class="topbar"><span class="logo">hitel</span>
+  ${back?`<span class="back" id="back">◀ 이전</span>`:""}<span class="title">${t}</span>
+  <span class="count">${r||""}</span></div><hr class="line">`; }
+
+/* 로그인/가입 */
+function renderAuth(){ stage="auth";
+  $("#screen").innerHTML=topbar("큰 마 을  P C 통 신","",false)+`
+    <div class="form"><h2>＊ 회원 접속 ＊</h2>
+      <input id="user" placeholder="아이디" maxlength="16" autocomplete="off">
+      <input id="pw" type="password" placeholder="비밀번호" maxlength="32">
+      <div class="rowbtn"><button id="login">로그인</button><button class="ghost" id="signup">회원가입</button></div>
+      <div class="err" id="err"></div><div class="muted">처음이면 회원가입 먼저 하세요.</div></div>`;
+  $("#user").focus();
+  const go=(a)=>{setErr("");const u=$("#user").value.trim(),p=$("#pw").value;
+    if(!u||!p){setErr("아이디와 비밀번호를 입력하세요.");return;}
+    if(!ws)connect(autoWsUrl()); sendS({action:a,username:u,password:p});};
+  $("#login").onclick=()=>go("login"); $("#signup").onclick=()=>go("signup");
+  $("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")go("login");});
+}
+
+/* 메인 메뉴 */
+function goHome(){ stage="home"; renderHome(); }
+function renderHome(){
+  const items=[
+    {n:1,nm:"플라자",desc:"게시판 — 글·추천",act:()=>enterBoard()},
+    {n:2,nm:"대화방",desc:"실시간 채팅 / 귓속말",act:()=>renderRoomCode()},
+    {n:3,nm:"자료실",desc:"자료 올리고 받기",act:()=>enterFiles()},
+    {n:4,nm:"쪽지함",desc:"쪽지 주고받기",act:()=>enterNotes(),badge:newNote},
+    {n:0,nm:"접속 종료",desc:"로그아웃",act:()=>logout()},
+  ];
+  $("#screen").innerHTML=topbar("메 인 메 뉴",esc(me)+" 님",false)+
+    `<div class="menu-list" id="menu"></div><hr class="line"><div class="muted">번호를 누르거나 항목을 클릭하세요.</div>`;
+  const box=$("#menu");
+  items.forEach(it=>{const el=document.createElement("div"); el.className="menu-item";
+    el.innerHTML=`<span class="num">${it.n}.</span><span class="nm">${it.nm}</span><span class="desc">${it.desc}${it.badge?' <span class="badge">★ 새 쪽지</span>':''}</span>`;
+    if(it.act)el.onclick=it.act; box.appendChild(el);});
+  document.onkeydown=(e)=>{const it=items.find(x=>String(x.n)===e.key);if(it&&it.act)it.act();};
+}
+function logout(){ me="";newNote=false;document.onkeydown=null;renderAuth(); }
+
+/* 플라자 */
+function enterBoard(){ document.onkeydown=null; stage="board"; renderBoard(); sendS({action:"board-list"}); }
+function renderBoard(){
+  $("#screen").innerHTML=topbar("플 라 자 (게시판)","글 목록",true)+
+    `<div class="head-row">번호  　이　름　 　날짜　 조회 추천 제　목</div><hr class="line">
+     <div class="scroll" id="list"><div class="muted">불러오는 중...</div></div><hr class="line">
+     <div class="footmenu"><b>W</b> 글쓰기　　<b>이전</b> 메뉴로</div>`;
+  $("#back").onclick=goHome;
+  document.onkeydown=(e)=>{if(e.key.toLowerCase()==="w")renderBoardWrite();};
+}
+function drawBoardList(list){ const box=$("#list"); if(!box)return;
+  if(!list.length){box.innerHTML=`<div class="muted">아직 글이 없습니다. W로 첫 글을 써보세요.</div>`;return;}
+  const byNo=new Map(list.map(p=>[p.no,p]));
+  const kids=(no)=>list.filter(p=>(p.parent||null)===no).sort((a,b)=>a.no-b.no);
+  const roots=list.filter(p=>!p.parent||!byNo.has(p.parent)).sort((a,b)=>b.no-a.no);
+  const rows=[];
+  const walk=(p,depth)=>{
+    const reply=depth>0, indent="  ".repeat(depth-1);
+    const title=reply?`${indent}└ ${esc(p.title)}`:esc(p.title);
+    rows.push(`<span class="post${reply?' reply':''}" data-no="${p.no}">${padL(p.no,4)}  ${pad(p.nick,6)} ${mmdd(p.time)} ${padL(p.hit,4)} ${padL(p.rec,4)}  ${title}</span>`);
+    kids(p.no).forEach(c=>walk(c,depth+1));
+  };
+  roots.forEach(r=>walk(r,0));
+  box.innerHTML=rows.join("\n");
+  document.querySelectorAll(".post").forEach(el=>el.onclick=()=>sendS({action:"board-read",no:+el.dataset.no}));
+}
+function renderBoardRead(){ stage="boardread"; const p=curPost;
+  const mineBtns = p.__mine ? `<button id="edit">수정</button> <button class="danger" id="del">삭제</button>　　` : "";
+  $("#screen").innerHTML=topbar("플 라 자 — 글 읽기","No."+p.no,true)+
+    `<div class="read-head">제 목 : ${esc(p.title)}
+글쓴이 : ${esc(p.nick)}    ${mmdd(p.time)} ${hhmm(p.time)}    조회 ${p.hit}  추천 ${p.rec||0}</div><hr class="line">
+     <div class="scroll"><div class="read-body">${esc(p.body)||"(내용 없음)"}</div></div><hr class="line">
+     <div class="footmenu"><span class="recbtn" id="rec">▲ 추천 ${p.rec||0}</span>　　<button id="reply">답글</button>　　${mineBtns}<b>이전</b> 목록으로</div>
+     <div class="err" id="err"></div>`;
+  const goList=()=>{stage="board";renderBoard();sendS({action:"board-list"});};
+  $("#back").onclick=goList;
+  $("#rec").onclick=()=>sendS({action:"board-rec",no:p.no});
+  $("#reply").onclick=()=>renderBoardReply();
+  if($("#edit"))$("#edit").onclick=()=>renderBoardEdit();
+  if($("#del"))$("#del").onclick=()=>{if(confirm("이 글을 삭제할까요?")){sendS({action:"board-delete",no:p.no});goList();}};
+  document.onkeydown=(e)=>{if(e.key==="Escape"||e.key.toLowerCase()==="p")goList();};
+}
+function renderBoardReply(){ stage="boardwrite"; document.onkeydown=null; const parent=curPost;
+  $("#screen").innerHTML=topbar("플 라 자 — 답글 쓰기","▶ No."+parent.no,true)+
+    `<div class="muted" style="text-align:left">┗ 원글: ${esc(parent.title)} (${esc(parent.nick)})</div><div style="height:6px"></div>
+     <input id="w-title" maxlength="60"><div style="height:8px"></div>
+     <textarea id="w-body" placeholder="답글 내용을 입력하세요..." style="flex:1"></textarea><hr class="line">
+     <div class="rowbtn"><button id="w-save">등록</button><button class="ghost" id="w-cancel">취소</button></div>
+     <div class="err" id="err"></div>`;
+  $("#w-title").value=("Re: "+parent.title).slice(0,60); $("#w-body").focus();
+  const goRead=()=>sendS({action:"board-read",no:parent.no});
+  $("#back").onclick=goRead; $("#w-cancel").onclick=goRead;
+  $("#w-save").onclick=()=>{const t=$("#w-title").value.trim();if(!t){setErr("제목을 입력하세요.");return;}
+    sendS({action:"board-write",title:t,body:$("#w-body").value,parent:parent.no});};
+}
+function renderBoardEdit(){ stage="boardedit"; document.onkeydown=null; const p=curPost;
+  $("#screen").innerHTML=topbar("플 라 자 — 글 수정","No."+p.no,true)+
+    `<input id="w-title" maxlength="60"><div style="height:8px"></div>
+     <textarea id="w-body" style="flex:1"></textarea><hr class="line">
+     <div class="rowbtn"><button id="w-save">저장</button><button class="ghost" id="w-cancel">취소</button></div>
+     <div class="err" id="err"></div>`;
+  $("#w-title").value=p.title; $("#w-body").value=p.body||""; $("#w-title").focus();
+  const goRead=()=>sendS({action:"board-read",no:p.no});
+  $("#back").onclick=goRead; $("#w-cancel").onclick=goRead;
+  $("#w-save").onclick=()=>{const t=$("#w-title").value.trim();if(!t){setErr("제목을 입력하세요.");return;}
+    sendS({action:"board-edit",no:p.no,title:t,body:$("#w-body").value});};
+}
+function renderBoardWrite(){ stage="boardwrite"; document.onkeydown=null;
+  $("#screen").innerHTML=topbar("플 라 자 — 글 쓰기","",true)+
+    `<input id="w-title" placeholder="제목" maxlength="60"><div style="height:8px"></div>
+     <textarea id="w-body" placeholder="내용을 입력하세요..." style="flex:1"></textarea><hr class="line">
+     <div class="rowbtn"><button id="w-save">등록</button><button class="ghost" id="w-cancel">취소</button></div>
+     <div class="err" id="err"></div>`;
+  $("#w-title").focus();
+  const goList=()=>{stage="board";renderBoard();sendS({action:"board-list"});};
+  $("#back").onclick=goList; $("#w-cancel").onclick=goList;
+  $("#w-save").onclick=()=>{const t=$("#w-title").value.trim();if(!t){setErr("제목을 입력하세요.");return;}
+    sendS({action:"board-write",title:t,body:$("#w-body").value});};
+}
+
+/* 자료실 */
+function enterFiles(){ document.onkeydown=null; stage="files"; renderFiles(); sendS({action:"file-list"}); }
+function renderFiles(){
+  $("#screen").innerHTML=topbar("자 료 실","자료 목록",true)+
+    `<div class="head-row">번호  　올린이　 　날짜　 다운  제　목</div><hr class="line">
+     <div class="scroll" id="list"><div class="muted">불러오는 중...</div></div><hr class="line">
+     <div class="footmenu"><b>W</b> 자료 등록　　<b>이전</b> 메뉴로</div>`;
+  $("#back").onclick=goHome;
+  document.onkeydown=(e)=>{if(e.key.toLowerCase()==="w")renderFileWrite();};
+}
+function drawFileList(list){ const box=$("#list"); if(!box)return;
+  if(!list.length){box.innerHTML=`<div class="muted">아직 자료가 없습니다. W로 첫 자료를 올려보세요.</div>`;return;}
+  box.innerHTML=list.map(f=>`<span class="post" data-no="${f.no}">${padL(f.no,4)}  ${pad(f.nick,6)} ${mmdd(f.time)} ${padL(f.dl,4)}  ${esc(f.title)}</span>`).join("\n");
+  document.querySelectorAll(".post").forEach(el=>el.onclick=()=>sendS({action:"file-read",no:+el.dataset.no}));
+}
+function renderFileRead(){ stage="fileread"; const f=curFile;
+  const linkHtml=f.url?`<a class="link" href="${esc(f.url)}" target="_blank" rel="noopener">▼ 다운로드 / 링크 열기</a>`:`<span class="muted">첨부 링크 없음</span>`;
+  $("#screen").innerHTML=topbar("자 료 실 — 자료 보기","No."+f.no,true)+
+    `<div class="read-head">제 목 : ${esc(f.title)}
+올린이 : ${esc(f.nick)}    ${mmdd(f.time)} ${hhmm(f.time)}    다운 ${f.dl||0}</div><hr class="line">
+     <div class="scroll"><div class="read-body">${esc(f.desc)||"(설명 없음)"}
+
+${linkHtml}</div></div><hr class="line">
+     <div class="footmenu">${f.__mine?`<button class="danger" id="del">삭제</button>　　`:""}<b>이전</b> 목록으로</div>
+     <div class="err" id="err"></div>`;
+  const goList=()=>{stage="files";renderFiles();sendS({action:"file-list"});};
+  $("#back").onclick=goList;
+  if($("#del"))$("#del").onclick=()=>{if(confirm("이 자료를 삭제할까요?")){sendS({action:"file-delete",no:f.no});goList();}};
+  document.onkeydown=(e)=>{if(e.key==="Escape"||e.key.toLowerCase()==="p")goList();};
+}
+function renderFileWrite(){ stage="filewrite"; document.onkeydown=null;
+  $("#screen").innerHTML=topbar("자 료 실 — 자료 등록","",true)+
+    `<input id="f-title" placeholder="자료 제목" maxlength="60"><div style="height:8px"></div>
+     <textarea id="f-desc" placeholder="자료 설명"></textarea><div style="height:8px"></div>
+     <input id="f-url" placeholder="다운로드 링크(URL) — 있으면 붙여넣기"><hr class="line">
+     <div class="rowbtn"><button id="f-save">등록</button><button class="ghost" id="f-cancel">취소</button></div>
+     <div class="err" id="err"></div>
+     <div class="muted">파일 자체 업로드는 아직 없어요. 구글드라이브 등 공유링크를 넣으면 됩니다.</div>`;
+  $("#f-title").focus();
+  const goList=()=>{stage="files";renderFiles();sendS({action:"file-list"});};
+  $("#back").onclick=goList; $("#f-cancel").onclick=goList;
+  $("#f-save").onclick=()=>{const t=$("#f-title").value.trim();if(!t){setErr("제목을 입력하세요.");return;}
+    sendS({action:"file-write",title:t,desc:$("#f-desc").value,url:$("#f-url").value.trim()});};
+}
+
+/* 쪽지함 */
+function enterNotes(){ document.onkeydown=null; newNote=false; stage="notes"; renderNotes(); sendS({action:"note-list"}); }
+function renderNotes(){
+  $("#screen").innerHTML=topbar("쪽 지 함","받은 쪽지",true)+
+    `<div class="scroll" id="list"><div class="muted">불러오는 중...</div></div><hr class="line">
+     <div class="footmenu"><b>W</b> 쪽지 쓰기　　<b>이전</b> 메뉴로</div><div class="err" id="err"></div>`;
+  $("#back").onclick=goHome;
+  document.onkeydown=(e)=>{if(e.key.toLowerCase()==="w")renderNoteWrite();};
+}
+function drawNoteList(list){ const box=$("#list"); if(!box)return;
+  if(!list.length){box.innerHTML=`<div class="muted">받은 쪽지가 없습니다. W로 쪽지를 보내보세요.</div>`;return;}
+  box.innerHTML=list.map(n=>`<span class="post ${n.read?"":"unread"}" data-id="${n.id}">${n.read?"　":"●"} ${pad(n.from,8)} ${mmdd(n.time)} ${hhmm(n.time)}  ${esc(n.preview)}</span>`).join("\n");
+  document.querySelectorAll(".post").forEach(el=>el.onclick=()=>sendS({action:"note-read",id:el.dataset.id}));
+}
+function renderNoteRead(){ stage="noteread"; const n=curNote;
+  $("#screen").innerHTML=topbar("쪽 지 — 읽기","",true)+
+    `<div class="read-head">보낸이 : ${esc(n.from)}    ${mmdd(n.time)} ${hhmm(n.time)}</div><hr class="line">
+     <div class="scroll"><div class="read-body">${esc(n.text)}</div></div><hr class="line">
+     <div class="rowbtn"><button id="reply">답장</button><button class="danger" id="del">삭제</button>
+       <button class="ghost" id="list2">목록</button></div>`;
+  const goList=()=>{stage="notes";renderNotes();sendS({action:"note-list"});};
+  $("#back").onclick=goList; $("#list2").onclick=goList;
+  $("#reply").onclick=()=>renderNoteWrite(n.from);
+  $("#del").onclick=()=>{sendS({action:"note-delete",id:n.id});goList();};
+  document.onkeydown=(e)=>{if(e.key==="Escape"||e.key.toLowerCase()==="p")goList();};
+}
+function renderNoteWrite(to){ stage="notewrite"; document.onkeydown=null;
+  $("#screen").innerHTML=topbar("쪽 지 — 쓰기","",true)+
+    `<input id="n-to" placeholder="받는 사람 아이디" value="${to?esc(to):""}"><div style="height:8px"></div>
+     <textarea id="n-text" placeholder="쪽지 내용" style="flex:1"></textarea><hr class="line">
+     <div class="rowbtn"><button id="n-send">보내기</button><button class="ghost" id="n-cancel">취소</button></div>
+     <div class="err" id="err"></div>`;
+  (to?$("#n-text"):$("#n-to")).focus();
+  const goList=()=>{stage="notes";renderNotes();sendS({action:"note-list"});};
+  $("#back").onclick=goList; $("#n-cancel").onclick=goList;
+  $("#n-send").onclick=()=>{const t=$("#n-to").value.trim();if(!t){setErr("받는 사람을 입력하세요.");return;}
+    if(!$("#n-text").value.trim()){setErr("내용을 입력하세요.");return;}
+    sendS({action:"note-send",to:t,text:$("#n-text").value});};
+}
+
+/* 대화방 */
+function renderRoomCode(){ stage="roomcode"; document.onkeydown=null;
+  $("#screen").innerHTML=topbar("대 화 방",esc(me)+" 님",true)+`
+    <div class="form"><h2>＊ 방 코드 4자리 ＊</h2>
+      <input id="code" placeholder="예: 1004" maxlength="4" inputmode="numeric" style="text-align:center;font-size:26px;letter-spacing:10px;">
+      <button id="enter">입장 / 새 방 만들기</button><div class="err" id="err"></div>
+      <div class="muted">같은 코드를 아는 사람끼리만 모입니다.</div></div>`;
+  $("#back").onclick=goHome; $("#code").focus();
+  const enter=()=>{setErr("");const c=$("#code").value.trim();if(!/^\d{4}$/.test(c)){setErr("숫자 4자리로 입력하세요.");return;}sendS({action:"join",code:c});};
+  $("#enter").onclick=enter; $("#code").addEventListener("keydown",e=>{if(e.key==="Enter")enter();});
+}
+function renderChat(){ stage="chat"; document.onkeydown=null;
+  $("#screen").innerHTML=topbar(`수다방 <span class="codebox">${esc(room)}</span>`,`<span id="hdr-count">참가자 0</span>`,true)+`
+    <div class="body"><div class="log" id="log"></div>
+      <div class="members"><h3>참가자</h3><div id="mlist"></div></div></div><hr class="line">
+    <div class="inputbar"><span class="pmt">${esc(me)} &gt;&gt;</span>
+      <input id="say" placeholder="대화 입력 · 귓속말은 /귓 닉네임 내용" autocomplete="off"></div>`;
+  $("#back").onclick=()=>{sendS({action:"leave-room"});room="";goHome();};
+  $("#say").focus();
+  $("#say").addEventListener("keydown",e=>{if(e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;e.target.value="";
+    const w=v.match(/^\/(?:귓|w)\s+(\S+)\s+([\s\S]+)$/); if(w)sendS({action:"whisper",to:w[1],text:w[2]});else sendS({action:"say",text:v});});
+  addSystem(`'${room}' 번 방에 입장했습니다. 코드를 아는 사람과 공유하세요.`);
+}
+function addLine(html){const l=$("#log");if(!l)return;l.insertAdjacentHTML("beforeend",html);l.scrollTop=l.scrollHeight;}
+function addSystem(t){addLine(`<div class="sys">─ ${esc(t)}</div>`);}
+function addMsg(nick,text,mine,time){const c=colorOf(nick),tag=mine?`<span class="me-tag">[나] </span>`:"";
+  addLine(`<div><span class="time">${hhmm(time||Date.now())} </span>${tag}<span class="nick" style="color:${c}">${esc(nick)}</span> : ${esc(text)}</div>`);}
+function addWhisper(from,to,text,mine){const label=mine?`${esc(to)} 님에게 귓속말`:`${esc(from)} 님의 귓속말`;
+  addLine(`<div class="whisper">((${label})) ${esc(text)}</div>`);}
+function drawMembers(list){const box=$("#mlist");if(!box)return;
+  box.innerHTML=list.map(n=>`<div style="color:${colorOf(n)}" data-n="${esc(n)}">● ${esc(n)}</div>`).join("");
+  const c=$("#hdr-count");if(c)c.textContent=`참가자 ${list.length}`;
+  document.querySelectorAll("#mlist div").forEach(el=>el.onclick=()=>{const s=$("#say");s.value=`/귓 ${el.dataset.n} `;s.focus();});}
+
+renderAuth();
+</script>
